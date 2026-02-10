@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RPS MAX – Play Online</title>
+
+<meta name="description" content="RPS MAX – The ultimate Rock Paper Scissors game. Compete, climb the leaderboard, and master the AI.">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{box-sizing:border-box;font-family:system-ui,sans-serif}
+body{
+  margin:0;min-height:100vh;
+  background:radial-gradient(circle at top,#200040,#000);
+  display:flex;justify-content:center;align-items:center;
+  color:#fff
+}
+.app{
+  width:440px;max-width:95%;
+  background:rgba(255,255,255,.08);
+  border-radius:24px;
+  padding:25px;
+  box-shadow:0 0 60px #b300ff;
+  text-align:center
+}
+h1{margin:0;font-size:32px;letter-spacing:2px}
+.subtitle{opacity:.75;margin-bottom:10px}
+
+input{
+  width:100%;padding:10px;
+  border-radius:10px;border:none;
+  margin-bottom:10px;font-size:16px
+}
+button{
+  cursor:pointer;border:none;
+  border-radius:12px;
+  padding:10px 16px;
+  font-size:16px;
+  background:linear-gradient(45deg,#ff0066,#9900ff);
+  color:#fff
+}
+button:hover{filter:brightness(1.2)}
+
+.topbar{
+  display:flex;justify-content:space-between;
+  font-size:14px;margin:10px 0
+}
+
+.score{
+  display:flex;justify-content:space-between;
+  margin:15px 0;font-size:18px
+}
+
+.choices{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;margin:15px 0
+}
+.choice{
+  font-size:32px;
+  background:rgba(255,255,255,.15)
+}
+.choice:hover{
+  transform:scale(1.2);
+  box-shadow:0 0 20px #ff00ff
+}
+
+.result{
+  min-height:50px;
+  font-size:18px;
+  margin-top:10px
+}
+
+.panel{
+  background:rgba(0,0,0,.3);
+  border-radius:12px;
+  padding:10px;
+  margin-top:10px;
+  font-size:14px
+}
+
+.footer{
+  margin-top:15px;
+  font-size:12px;
+  opacity:.7
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<h1>RPS MAX</h1>
+<div class="subtitle">Compete. Win. Climb.</div>
+
+<!-- LOGIN -->
+<div id="login">
+  <input id="username" placeholder="Choose a username" maxlength="12">
+  <button onclick="start()">Start</button>
+</div>
+
+<!-- GAME -->
+<div id="game" style="display:none">
+
+  <div class="topbar">
+    <div>Player: <b id="name"></b></div>
+    <div>🔊 <input type="checkbox" id="sound" checked></div>
+  </div>
+
+  <div class="panel">
+    Wins: <span id="wins">0</span> |
+    Losses: <span id="losses">0</span> |
+    Win %: <span id="winrate">0</span>%
+  </div>
+
+  <div class="score">
+    <div>You: <span id="pScore">0</span></div>
+    <div>AI: <span id="aScore">0</span></div>
+  </div>
+
+  <div class="choices">
+    <button class="choice" onclick="play('rock')">✊</button>
+    <button class="choice" onclick="play('paper')">✋</button>
+    <button class="choice" onclick="play('scissors')">✌️</button>
+    <button class="choice" onclick="play('lizard')">🦎</button>
+    <button class="choice" onclick="play('spock')">🖖</button>
+  </div>
+
+  <div class="result" id="result">Make your move.</div>
+
+  <button onclick="resetMatch()">Reset Match</button>
+</div>
+
+<div class="footer">
+Keyboard: R P S L K<br>
+© RPS MAX
+</div>
+
+</div>
+
+<script>
+/* ---------------- DATA ---------------- */
+const rules={
+ rock:["scissors","lizard"],
+ paper:["rock","spock"],
+ scissors:["paper","lizard"],
+ lizard:["spock","paper"],
+ spock:["scissors","rock"]
+};
+
+let user=localStorage.user||"";
+let stats=JSON.parse(localStorage.stats||
+ '{"wins":0,"losses":0,"games":0}');
+let pScore=0,aScore=0;
+let history=[];
+
+/* ---------------- ELEMENTS ---------------- */
+const login=document.getElementById("login");
+const game=document.getElementById("game");
+const resultEl=document.getElementById("result");
+
+/* ---------------- INIT ---------------- */
+if(user)start(true);
+
+/* ---------------- FUNCTIONS ---------------- */
+function start(auto=false){
+ const input=document.getElementById("username");
+ if(!auto){
+  if(!input.value.trim())return;
+  user=input.value.trim();
+  localStorage.user=user;
+ }
+ login.style.display="none";
+ game.style.display="block";
+ document.getElementById("name").textContent=user;
+ updateStats();
+}
+
+function beep(win){
+ if(!document.getElementById("sound").checked)return;
+ const ac=new AudioContext();
+ const o=ac.createOscillator();
+ o.frequency.value=win?700:180;
+ o.connect(ac.destination);
+ o.start();
+ setTimeout(()=>o.stop(),120);
+}
+
+function aiMove(){
+ if(history.length<2)return rand();
+ const last=history.at(-1);
+ return Object.keys(rules)
+  .find(m=>rules[m].includes(last))||rand();
+}
+
+function rand(){
+ const k=Object.keys(rules);
+ return k[Math.random()*k.length|0];
+}
+
+function play(move){
+ history.push(move);
+ const ai=aiMove();
+
+ if(move===ai){
+  result("😐 Draw! Both chose "+move);
+  return;
+ }
+
+ if(rules[move].includes(ai)){
+  pScore++;stats.wins++;beep(true);
+  result("🔥 You win! "+move+" beats "+ai);
+ }else{
+  aScore++;stats.losses++;beep(false);
+  result("💀 AI wins! "+ai+" beats "+move);
+ }
+
+ stats.games++;
+ save();
+ update();
+}
+
+function result(text){
+ resultEl.textContent=text;
+}
+
+function update(){
+ document.getElementById("pScore").textContent=pScore;
+ document.getElementById("aScore").textContent=aScore;
+ updateStats();
+}
+
+function updateStats(){
+ document.getElementById("wins").textContent=stats.wins;
+ document.getElementById("losses").textContent=stats.losses;
+ const wr=stats.games?
+  Math.round(stats.wins/stats.games*100):0;
+ document.getElementById("winrate").textContent=wr;
+}
+
+function save(){
+ localStorage.stats=JSON.stringify(stats);
+}
+
+function resetMatch(){
+ pScore=0;aScore=0;history=[];
+ update();
+ result("Match reset. Go again.");
+}
+
+document.addEventListener("keydown",e=>{
+ const m={r:"rock",p:"paper",s:"scissors",l:"lizard",k:"spock"};
+ if(m[e.key])play(m[e.key]);
+});
+</script>
+
+</body>
+</html>
